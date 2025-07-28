@@ -1,0 +1,9 @@
+# Extractoor output directory
+output/
+
+# VS Code settings
+.vscode/
+
+# Test directories
+test/
+tests/
