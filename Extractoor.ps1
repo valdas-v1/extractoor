@@ -128,9 +128,9 @@ function Get-DestinationPath {
             continue
         }
         
-        # Check if parent directory exists
+        # Check if parent directory exists (skip for drive roots)
         $parentDir = Split-Path $destPath -Parent
-        if (-not (Test-Path $parentDir)) {
+        if ($parentDir -and -not (Test-Path $parentDir)) {
             Write-ColorOutput "ERROR: Parent directory '$parentDir' does not exist!" "Red"
             continue
         }
