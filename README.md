@@ -41,26 +41,29 @@ Extract and organize your valuable media files from old drives, phones, and back
 2. **Intelligent Fallback**: Uses filesystem dates only when metadata unavailable  
 3. **Deduplication**: MD5 hashing prevents duplicate storage
 4. **Smart Organization**: Groups by type and real capture date
-5. **Clean Naming**: `2024-07-15_A1B2C3D4.jpg` format for chronological sorting
+5. **Clean Naming**: `2024-07-15_14.32.45_A1B2C3D4.jpg` format with full timestamp
+6. **Incremental Safety**: Skips identical files, warns on conflicts
 
 ## Output Structure
 
 ```
 Backup/
-├── Images/2024-07/2024-07-15_A1B2C3D4.jpg    # Real photo date
-├── Videos/2024-10/2024-10-08_9I0J1K2L.mp4    # Real recording date  
-└── Audio/2024-11/2024-11-20_M3N4O5P6.mp3
+├── Images/2024-07/2024-07-15_14.32.45_A1B2C3D4.jpg    # Full timestamp for perfect sorting
+├── Videos/2024-10/2024-10-08_09.15.22_9I0J1K2L.mp4    # Precise chronological order  
+└── Audio/2024-11/2024-11-20_18.45.12_M3N4O5P6.mp3
 ```
 
-Files named with actual capture dates, not when they were copied or modified.
+Files named with precise capture time for perfect chronological sorting. Re-running backups only copies new files.
 
 ## Technical Details
 
 **Date Sources**: EXIF index 12 (images), Media Created index 208 (videos)  
 **Unicode Handling**: Strips invisible formatting characters from metadata  
 **Path Safety**: Handles 250+ character paths and special characters  
+**Performance**: Single directory scan with extension filtering (not per-extension recursion)  
+**Incremental Backups**: Hash comparison skips identical files, shows new vs existing counts  
 **Error Recovery**: Continues processing with detailed error reporting  
-**Size Filtering**: Excludes files <35KB (configurable) to skip thumbnails
+**Size Filtering**: Excludes files <10KB (configurable) to skip thumbnails
 
 ## Advanced Usage
 
@@ -80,9 +83,9 @@ Files named with actual capture dates, not when they were copied or modified.
 Most backup tools copy files with current timestamps, destroying chronological order. Extractoor preserves the moment you actually captured that photo or recorded that video, making your backup truly useful for photo management software.
 
 **Before**: `IMG_20241008_190245.jpg` (Creation: Dec 23, 2024)  
-**After**: `2024-10-08_9A45C7B2.jpg` (Creation: Oct 8, 2024)
+**After**: `2024-10-08_19.02.45_9A45C7B2.jpg` (Creation: Oct 8, 2024)
 
-The second file will appear in your photo library on the correct date.
+The second file will appear in your photo library on the correct date and time. Incremental backups are fast since identical files are automatically skipped.
 
 ## Installation
 
