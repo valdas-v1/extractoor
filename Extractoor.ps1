@@ -497,7 +497,7 @@ function Backup-MediaFile {
                     }
                 } else {
                     # Different file with same name - this shouldn't happen with hash-based naming, but handle it
-                    Write-ColorOutput "WARNING: File exists with different content: $newFileName - Overwriting!" "Yellow"
+                    Write-ColorOutput "WARNING: File exists with different content:`n  Destination: $destFilePath`n  Existing file hash: $existingHash`n  Incoming file hash: $fileHash`n  Overwriting!" "Yellow"
                     Copy-Item -LiteralPath $File.FullName -Destination $destFilePath -Force
                     # Preserve original file timestamps and attributes
                     Set-PreservedFileAttributes -SourceFile $File -DestinationPath $destFilePath
@@ -593,7 +593,7 @@ function Show-Summary {
         Write-ColorOutput "Files $action`: $Global:BackedUpCount" "Green"
     } else {
         $existingFiles = $Global:BackedUpCount - $Global:NewFilesCount
-        Write-ColorOutput "Files $action`: $Global:BackedUpCount ($Global:NewFilesCount new)" "Green"
+        Write-ColorOutput "Files $action`: $Global:BackedUpCount ($Global:NewFilesCount new, $existingFiles existing)" "Green"
     }
     
     Write-ColorOutput "Small files skipped: $Global:SkippedSmallFiles (< ${MinFileSizeKB}KB)" "Gray"
