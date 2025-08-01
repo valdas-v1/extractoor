@@ -46,6 +46,7 @@ $MediaExtensions = @(
 $Global:ProcessedFiles = @{}
 $Global:DuplicateCount = 0
 $Global:BackedUpCount = 0
+$Global:NewFilesCount = 0
 $Global:ErrorCount = 0
 $Global:ErrorMessages = @()
 $Global:SkippedSmallFiles = 0
@@ -253,13 +254,13 @@ function Get-CleanFileName {
         # Get hash prefix (8 characters)
         $hashPrefix = $FileHash.Substring(0, 8)
         
-        # Format date as YYYY-MM-DD
-        $dateStr = $FileDate.ToString("yyyy-MM-dd")
+        # Format date with time as YYYY-MM-DD_HH.MM.SS for better chronological sorting
+        $dateStr = $FileDate.ToString("yyyy-MM-dd_HH.mm.ss")
         
         # Get clean extension
         $extension = $File.Extension.ToLower()
         
-        # Create clean filename: YYYY-MM-DD_HASH.ext (no time component for cleaner names)
+        # Create clean filename: YYYY-MM-DD_HH.MM.SS_HASH.ext (full timestamp for perfect sorting)
         $cleanFileName = "$dateStr`_$hashPrefix$extension"
         
         return $cleanFileName
@@ -375,20 +376,31 @@ function Find-MediaFiles {
     Write-ColorOutput "Source: $Path" "Gray"
     Write-ColorOutput "Filter: Files >= ${MinFileSizeKB}KB (excludes icons/thumbnails)" "Gray"
     
-    $mediaFiles = @()
-    
-    foreach ($extension in $MediaExtensions) {
-        try {
-            # Use -LiteralPath for better handling of paths with special characters
-            $files = Get-ChildItem -LiteralPath $Path -Filter $extension -Recurse -File -ErrorAction SilentlyContinue
-            $mediaFiles += $files
+    try {
+        # Get all files once, then filter by extension (much more efficient)
+        Write-ColorOutput "Scanning directory structure..." "Gray"
+        $allFiles = Get-ChildItem -LiteralPath $Path -Recurse -File -ErrorAction SilentlyContinue
+        
+        Write-ColorOutput "Filtering media files..." "Gray"
+        
+        # Convert extensions to a more efficient lookup format
+        $extensionSet = @{}
+        foreach ($ext in $MediaExtensions) {
+            $cleanExt = $ext.Replace("*", "").ToLower()
+            $extensionSet[$cleanExt] = $true
         }
-        catch {
-            # Continue with other extensions if one fails
+        
+        # Filter files by extension
+        $mediaFiles = $allFiles | Where-Object { 
+            $extensionSet.ContainsKey($_.Extension.ToLower()) 
         }
+        
+        return $mediaFiles
     }
-    
-    return $mediaFiles
+    catch {
+        Write-ColorOutput "Error scanning directory: $($_.Exception.Message)" "Red"
+        return @()
+    }
 }
 
 # Function to backup single file
@@ -474,11 +486,30 @@ function Backup-MediaFile {
                 New-Item -ItemType Directory -Path $destFolder -Force | Out-Null
             }
             
-            # Copy the file using -LiteralPath for better path handling
-            Copy-Item -LiteralPath $File.FullName -Destination $destFilePath -Force
-            
-            # Preserve original file timestamps and attributes
-            Set-PreservedFileAttributes -SourceFile $File -DestinationPath $destFilePath
+            # Check if destination file already exists
+            if (Test-Path -LiteralPath $destFilePath) {
+                # File exists - check if it's the same file by comparing hashes
+                $existingHash = Get-FileHashMD5 -FilePath $destFilePath
+                if ($existingHash -eq $fileHash) {
+                    # Same file already exists, skip copying but still count as backed up
+                    if ($Verbose) {
+                        Write-ColorOutput "File already exists (same content): $newFileName" "Cyan"
+                    }
+                } else {
+                    # Different file with same name - this shouldn't happen with hash-based naming, but handle it
+                    Write-ColorOutput "WARNING: File exists with different content: $newFileName - Overwriting!" "Yellow"
+                    Copy-Item -LiteralPath $File.FullName -Destination $destFilePath -Force
+                    # Preserve original file timestamps and attributes
+                    Set-PreservedFileAttributes -SourceFile $File -DestinationPath $destFilePath
+                    $Global:NewFilesCount++
+                }
+            } else {
+                # File doesn't exist, copy it normally
+                Copy-Item -LiteralPath $File.FullName -Destination $destFilePath -Force
+                # Preserve original file timestamps and attributes
+                Set-PreservedFileAttributes -SourceFile $File -DestinationPath $destFilePath
+                $Global:NewFilesCount++
+            }
         }
         
         # Record this hash as processed
@@ -557,7 +588,14 @@ function Show-Summary {
     Write-ColorOutput "=================================================================" "Cyan"
     Write-ColorOutput "                        SUMMARY                                 " "Cyan"
     Write-ColorOutput "=================================================================" "Cyan"
-    Write-ColorOutput "Files $action`: $Global:BackedUpCount" "Green"
+    
+    if ($PreviewMode) {
+        Write-ColorOutput "Files $action`: $Global:BackedUpCount" "Green"
+    } else {
+        $existingFiles = $Global:BackedUpCount - $Global:NewFilesCount
+        Write-ColorOutput "Files $action`: $Global:BackedUpCount ($Global:NewFilesCount new)" "Green"
+    }
+    
     Write-ColorOutput "Small files skipped: $Global:SkippedSmallFiles (< ${MinFileSizeKB}KB)" "Gray"
     Write-ColorOutput "Timestamp fixes applied: $Global:TimestampFixCount" "Cyan"
     Write-ColorOutput "Duplicates found: $Global:DuplicateCount" "Yellow"
@@ -596,6 +634,7 @@ function Start-MediaBackup {
     $Global:ProcessedFiles = @{}
     $Global:DuplicateCount = 0
     $Global:BackedUpCount = 0
+    $Global:NewFilesCount = 0
     $Global:ErrorCount = 0
     $Global:ErrorMessages = @()
     $Global:SkippedSmallFiles = 0
